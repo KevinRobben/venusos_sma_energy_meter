@@ -114,10 +114,14 @@ class HomeManager20:
             return False
 
         self.datagram = self.sock.recv(608)
+        if len(self.datagram) < 500: # too short
+            return False
+        
         return True
 
 
-    def _decode_data(self):        
+    def _decode_data(self):    
+            
         if self.datagram[:4] != b'SMA\x00':
             print('wrong header')
             return
@@ -130,6 +134,8 @@ class HomeManager20:
         if serial == 0xffffffff : # wrong serial?
             print('wrong serial')
             return
+        
+
 
         self.last_update = time.time()
         self.hmdata = {}
@@ -159,7 +165,7 @@ class HomeManager20:
 
 if __name__ == "__main__":
     sma = HomeManager20()
-    
+
     while True:
         if sma._read_data(timeout=1):
             sma._decode_data()

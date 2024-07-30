@@ -11,7 +11,7 @@ import _thread as thread
 from homemanager_decoder import HomeManager20, MCAST_GRP
 
 # necessary packages from victron
-sys.path.insert(1, os.path.join(os.path.dirname(__file__), './ext/velib_python'))
+sys.path.insert(1, os.path.join(os.path.dirname(__file__), '/opt/victronenergy/dbus-systemcalc-py/ext/velib_python')) # './ext/velib_python'
 from vedbus import VeDbusService
 
 VERSION = '2024.01'
@@ -22,12 +22,12 @@ class DbusSmaService:
         self.home_manager = HomeManager20()
 
         # Read data from Home Manager once to get the serial number and firmware version
-        if not self.home_manager._read_data(timeout=10):
-            logging.error('Could not read data from Home Manager, aborting startup')
-            sys.exit(1)
-        self.home_manager._decode_data()
+        # if not self.home_manager._read_data(timeout=10):
+        #     logging.error('Could not read data from Home Manager, aborting startup')
+        #     sys.exit(1)
+        # self.home_manager._decode_data()
 
-        self._dbusservice = VeDbusService(servicename)
+        self._dbusservice = VeDbusService("{}.http_{:02d}".format(servicename, deviceinstance))
         logging.debug(f"{servicename} /DeviceInstance = {deviceinstance}")
 
         # Register management objects, see dbus-api for more information
@@ -39,10 +39,10 @@ class DbusSmaService:
         self._dbusservice.add_path('/DeviceInstance', deviceinstance)
         self._dbusservice.add_path('/ProductId', 45058)  # value used in ac_sensor_bridge.cpp of dbus-cgwacs
         self._dbusservice.add_path('/ProductName', productname)
-        self._dbusservice.add_path('/FirmwareVersion', self.home_manager.hmdata['fw_version'])
+        # self._dbusservice.add_path('/FirmwareVersion', self.home_manager.hmdata['fw_version'])
         self._dbusservice.add_path('/HardwareVersion', 0)
         self._dbusservice.add_path('/Connected', 1)
-        self._dbusservice.add_path('/Serial', self.home_manager.hmdata['serial'])
+        # self._dbusservice.add_path('/Serial', self.home_manager.hmdata['serial'])
         self._dbusservice.add_path('/Ac/Power', 0, gettextcallback=self._get_text_for_w)
         self._dbusservice.add_path('/Ac/L1/Voltage', 0, gettextcallback=self._get_text_for_v)
         self._dbusservice.add_path('/Ac/L2/Voltage', 0, gettextcallback=self._get_text_for_v)
@@ -72,6 +72,10 @@ class DbusSmaService:
             if self.home_manager.last_update + 2 < time.time():
                 logging.error('No data received from Home Manager for 2 seconds, setting all values to zero')
                 self.home_manager.hmdata = {}
+            
+        if not self.home_manager.hmdata.get('serial', False):
+            print("No serial number found, aborting update")
+            return True
 
         with contextlib.suppress(KeyError):
             # Check if the Home Manager is single phase or three phase
@@ -102,11 +106,11 @@ class DbusSmaService:
             self._dbusservice['/Ac/L2/Current'] = self.home_manager.hmdata.get('current_L2', 0)
             self._dbusservice['/Ac/L3/Current'] = self.home_manager.hmdata.get('current_L3', 0)
 
-            self._dbusservice['/AC/L1/Power'] = self.home_manager.hmdata.get('positive_active_demand_L1', 0) - \
+            self._dbusservice['/Ac/L1/Power'] = self.home_manager.hmdata.get('positive_active_demand_L1', 0) - \
                                                 self.home_manager.hmdata.get('negative_active_demand_L1', 0)
-            self._dbusservice['/AC/L2/Power'] = self.home_manager.hmdata.get('positive_active_demand_L2', 0) - \
+            self._dbusservice['/Ac/L2/Power'] = self.home_manager.hmdata.get('positive_active_demand_L2', 0) - \
                                                 self.home_manager.hmdata.get('negative_active_demand_L2', 0)
-            self._dbusservice['/AC/L3/Power'] = self.home_manager.hmdata.get('positive_active_demand_L3', 0) - \
+            self._dbusservice['/Ac/L3/Power'] = self.home_manager.hmdata.get('positive_active_demand_L3', 0) - \
                                                 self.home_manager.hmdata.get('negative_active_demand_L3', 0)
             
             self._dbusservice['/Ac/L1/Energy/Forward'] = self.home_manager.hmdata.get('positive_active_energy_L1', 0)
